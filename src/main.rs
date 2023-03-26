@@ -1,16 +1,23 @@
-use clap::Parser;
+use std::path::PathBuf;
+
+use clap::{ArgGroup, Parser};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
+#[command(group(ArgGroup::new("mode").required(true)))]
 struct Args {
-  #[clap(short, long, conflicts_with = "extract")]
-  output: Option<String>,
-  #[clap(short, long, conflicts_with = "output")]
-  extract: Option<String>,
-  #[clap(required = true)]
-  files: Vec<String>,
+  #[arg(short, long, value_name = "FILE", group = "mode")]
+  output: Option<PathBuf>,
+
+  #[arg(short = 'x', long, value_name = "FILE", group = "mode")]
+  extract: Option<PathBuf>,
+
+  files: Vec<PathBuf>,
 }
 
+fn extract(src: PathBuf, dst: PathBuf) {}
+fn output(files: Vec<PathBuf>, output: PathBuf) {}
+
 fn main() {
-  let _ = Args::parse();
+  let args = Args::parse();
 }
