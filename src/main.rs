@@ -79,16 +79,40 @@ fn extract(src: PathBuf, dst: Option<PathBuf>) -> Result<()> {
     }
 
     Format::Zip => {
-      Command::new("unzip").arg(src).arg("-d").arg(dst).output()?;
+      Command::new("unzip").arg(src).arg("-d").arg(dst).spawn()?.wait()?;
     }
   }
 
   Ok(())
 }
 
-fn compress(srcs: &[PathBuf], dst: PathBuf) {}
+fn compress(srcs: &[PathBuf], dst: PathBuf) -> Result<()> {
+  match Format::try_from(dst.as_path())? {
+    Format::TarGz => {
+      Command::new("tar").arg("-czf").arg(dst).args(srcs).spawn()?.wait()?;
+    }
 
-fn list(list: PathBuf) {}
+    Format::Zip => {
+      Command::new("zip").arg("--recurse-paths").arg(dst).args(srcs).spawn()?.wait()?;
+    }
+  }
+
+  Ok(())
+}
+
+fn list(src: PathBuf) -> Result<()> {
+  match Format::try_from(src.as_path())? {
+    Format::TarGz => {
+      Command::new("tar").arg("-tvf").arg(src).spawn()?.wait()?;
+    }
+
+    Format::Zip => {
+      Command::new("unzip").arg("-l").arg(src).spawn()?.wait()?;
+    }
+  }
+
+  Ok(())
+}
 
 fn main() -> Result<()> {
   let args = Args::parse();
@@ -96,9 +120,9 @@ fn main() -> Result<()> {
   if let Some(file) = args.extract {
     extract(file, args.files.first().cloned()).context("Failed to extract file")?;
   } else if let Some(file) = args.compress {
-    compress(&args.files, file);
+    compress(&args.files, file).context("Failed to compress file(s)")?;
   } else if let Some(file) = args.list {
-    list(file);
+    list(file).context("Failed to list contents of file")?;
   }
 
   Ok(())
