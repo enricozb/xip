@@ -1,6 +1,6 @@
-# xip - Multiformat (Un)Compression
+# xip - multi-format archive utility
 
-## Usages
+## usages
 ```sh
 # compress files or directories
 zip -c <archive> [directory or file...]
