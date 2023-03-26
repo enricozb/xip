@@ -1,5 +1,4 @@
 use std::{
-  ffi::OsStr,
   fs,
   path::{Path, PathBuf},
   process::Command,
@@ -26,6 +25,7 @@ struct Args {
 
 /// Supported archive formats.
 enum Format {
+  Tar,
   TarGz,
   Zip,
 }
@@ -34,30 +34,17 @@ impl TryFrom<&Path> for Format {
   type Error = Error;
 
   fn try_from(path: &Path) -> Result<Self, Self::Error> {
-    match extension(path).as_deref() {
-      Some("zip") => Ok(Format::Zip),
-      Some("tar.gz") => Ok(Format::TarGz),
-      Some(ext) => Err(format_err!("Unsupported extension: {:?}", ext)),
+    let path_str = path.to_string_lossy();
 
-      None => Err(format_err!("No extension for file: {:?}", path)),
+    if path_str.ends_with(".zip") {
+      Ok(Format::Zip)
+    } else if path_str.ends_with(".tar") {
+      Ok(Format::Tar)
+    } else if path_str.ends_with(".tar.gz") {
+      Ok(Format::TarGz)
+    } else {
+      Err(format_err!("Unsupported extension: {:?}", path))
     }
-  }
-}
-
-/// Returns extension of path, specifically everything after the second to last dot.
-///
-/// foo.zip -> zip
-/// foo.tar.gz -> tar.gz
-/// foo.x.tar.gz -> tar.gz
-fn extension(path: &Path) -> Option<String> {
-  let first = path.with_extension("");
-  let first = first.extension().and_then(OsStr::to_str);
-  let last = path.extension().and_then(OsStr::to_str);
-
-  match (first, last) {
-    (Some(first), Some(last)) => Some(format!("{}.{}", first, last)),
-    (_, Some(last)) => Some(last.to_owned()),
-    (_, _) => None,
   }
 }
 
@@ -74,7 +61,7 @@ fn extract(src: PathBuf, dst: Option<PathBuf>) -> Result<()> {
   };
 
   match Format::try_from(src.as_path())? {
-    Format::TarGz => {
+    Format::Tar | Format::TarGz => {
       Command::new("tar").arg("-xf").arg(src).arg("--directory").arg(dst).spawn()?.wait()?;
     }
 
@@ -88,6 +75,10 @@ fn extract(src: PathBuf, dst: Option<PathBuf>) -> Result<()> {
 
 fn compress(srcs: &[PathBuf], dst: PathBuf) -> Result<()> {
   match Format::try_from(dst.as_path())? {
+    Format::Tar => {
+      Command::new("tar").arg("-cf").arg(dst).args(srcs).spawn()?.wait()?;
+    }
+
     Format::TarGz => {
       Command::new("tar").arg("-czf").arg(dst).args(srcs).spawn()?.wait()?;
     }
@@ -102,7 +93,7 @@ fn compress(srcs: &[PathBuf], dst: PathBuf) -> Result<()> {
 
 fn list(src: PathBuf) -> Result<()> {
   match Format::try_from(src.as_path())? {
-    Format::TarGz => {
+    Format::Tar | Format::TarGz => {
       Command::new("tar").arg("-tvf").arg(src).spawn()?.wait()?;
     }
 
