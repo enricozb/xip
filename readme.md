@@ -1,10 +1,13 @@
-# Omnizip - Multiformat (Un)Compression
+# xip - Multiformat (Un)Compression
 
 ## Usages
 ```sh
 # compress files or directories
-zip -o <destination file> [directory or file...]
+zip -c <archive> [directory or file...]
 
 # extract a file to a directory
-zip -x <file to decompress> [directory]
+zip -x <archive> [directory]
+
+# list an archive's contents
+zip -l <archive>
 ```
