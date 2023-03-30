@@ -12,12 +12,12 @@ use clap::{ArgGroup, Parser};
 #[command(group(ArgGroup::new("mode").required(true)))]
 struct Args {
   #[arg(short = 'x', long, value_name = "ARCHIVE", group = "mode")]
-  /// Extracts the ARCHIVE to a directory named ARCHIVE.extracted, or to the directory provided as a
+  /// Extracts the ARCHIVE to a ARCHIVE.extracted directory, or to the directory provided the next
   /// positional argument.
   extract: Option<PathBuf>,
 
   #[arg(short, long, value_name = "ARCHIVE", group = "mode")]
-  /// Compress the FILES to the ARCHIVE.
+  /// Compress the PATHS into the ARCHIVE.
   compress: Option<PathBuf>,
 
   #[arg(short, long, value_name = "ARCHIVE", group = "mode")]
