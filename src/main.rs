@@ -11,16 +11,111 @@ use clap::{ArgGroup, Parser};
 #[clap(author, version, about)]
 #[command(group(ArgGroup::new("mode").required(true)))]
 struct Args {
-  #[arg(short = 'x', long, value_name = "FILE", group = "mode")]
+  #[arg(short = 'x', long, value_name = "ARCHIVE", group = "mode")]
+  /// Extracts the ARCHIVE to a directory named ARCHIVE.extracted, or to the directory provided as a
+  /// positional argument.
   extract: Option<PathBuf>,
 
-  #[arg(short, long, value_name = "FILE", group = "mode")]
+  #[arg(short, long, value_name = "ARCHIVE", group = "mode")]
+  /// Compress the FILES to the ARCHIVE.
   compress: Option<PathBuf>,
 
-  #[arg(short, long, value_name = "FILE", group = "mode")]
+  #[arg(short, long, value_name = "ARCHIVE", group = "mode")]
+  /// List the contents of the ARCHIVE.
   list: Option<PathBuf>,
 
+  /// The files or directories to compress, or the directory to extract to.
+  #[arg(value_name = "PATHS")]
   files: Vec<PathBuf>,
+
+  #[arg(long, value_name = "BIN")]
+  /// Which tar utility to use.
+  tar: Option<String>,
+
+  #[arg(long, value_name = "BIN")]
+  /// Which unzip utility to use.
+  unzip: Option<String>,
+
+  #[arg(long, value_name = "BIN")]
+  /// Which zip utility to use.
+  zip: Option<String>,
+}
+
+impl Args {
+  fn tar_command(&self) -> Command {
+    Command::new(self.tar.as_deref().unwrap_or("tar"))
+  }
+
+  fn unzip_command(&self) -> Command {
+    Command::new(self.unzip.as_deref().unwrap_or("unzip"))
+  }
+
+  fn zip_command(&self) -> Command {
+    Command::new(self.zip.as_deref().unwrap_or("zip"))
+  }
+
+  fn extract<P: AsRef<Path>>(&self, archive: P) -> Result<()> {
+    let archive = archive.as_ref();
+    // create directory if one doesn't exist
+    let dir = if let Some(dir) = self.files.first() {
+      dir.clone()
+    } else {
+      let dir = archive.with_extension("extracted");
+      fs::create_dir(&dir).with_context(|| format!("Failed to create destination directory: {:?}", &dir))?;
+      dir
+    };
+
+    let format = Format::try_from(archive)?;
+
+    match format {
+      Format::Tar | Format::TarGz => {
+        self.tar_command().arg("-xvf").arg(archive).arg("--directory").arg(dir).spawn()?.wait()?;
+      }
+
+      Format::Zip => {
+        self.unzip_command().arg(archive).arg("-d").arg(dir).spawn()?.wait()?;
+      }
+    }
+
+    Ok(())
+  }
+
+  fn compress<P: AsRef<Path>>(&self, archive: P) -> Result<()> {
+    let srcs = &self.files;
+    let archive = archive.as_ref();
+
+    match Format::try_from(archive)? {
+      Format::Tar => {
+        self.tar_command().arg("-cvf").arg(archive).args(srcs).spawn()?.wait()?;
+      }
+
+      Format::TarGz => {
+        self.tar_command().arg("-czvf").arg(archive).args(srcs).spawn()?.wait()?;
+      }
+
+      Format::Zip => {
+        self.zip_command().arg("--recurse-paths").arg(archive).args(srcs).spawn()?.wait()?;
+      }
+    }
+
+    Ok(())
+  }
+
+  fn list<P: AsRef<Path>>(&self, archive: P) -> Result<()> {
+    let archive = archive.as_ref();
+
+    match Format::try_from(archive)? {
+      Format::Tar | Format::TarGz => {
+        self.tar_command().arg("-tvf").arg(archive).spawn()?.wait()?;
+      }
+
+      Format::Zip => {
+        self.unzip_command().arg("-l").arg(archive).spawn()?.wait()?;
+      }
+    }
+
+    Ok(())
+  }
 }
 
 /// Supported archive formats.
@@ -48,75 +143,15 @@ impl TryFrom<&Path> for Format {
   }
 }
 
-fn extract(src: PathBuf, dst: Option<PathBuf>) -> Result<()> {
-  // fail early on the format being invalid
-  let format = Format::try_from(src.as_path())?;
-
-  // Create a destination directory if none exists
-  let dst = if let Some(dst) = dst {
-    dst
-  } else {
-    let dst = src.with_extension("extracted");
-
-    fs::create_dir(&dst).with_context(|| format!("Failed to create destination directory: {:?}", &dst))?;
-
-    dst
-  };
-
-  match format {
-    Format::Tar | Format::TarGz => {
-      Command::new("tar").arg("-xf").arg(src).arg("--directory").arg(dst).spawn()?.wait()?;
-    }
-
-    Format::Zip => {
-      Command::new("unzip").arg(src).arg("-d").arg(dst).spawn()?.wait()?;
-    }
-  }
-
-  Ok(())
-}
-
-fn compress(srcs: &[PathBuf], dst: PathBuf) -> Result<()> {
-  match Format::try_from(dst.as_path())? {
-    Format::Tar => {
-      Command::new("tar").arg("-cf").arg(dst).args(srcs).spawn()?.wait()?;
-    }
-
-    Format::TarGz => {
-      Command::new("tar").arg("-czf").arg(dst).args(srcs).spawn()?.wait()?;
-    }
-
-    Format::Zip => {
-      Command::new("zip").arg("--recurse-paths").arg(dst).args(srcs).spawn()?.wait()?;
-    }
-  }
-
-  Ok(())
-}
-
-fn list(src: PathBuf) -> Result<()> {
-  match Format::try_from(src.as_path())? {
-    Format::Tar | Format::TarGz => {
-      Command::new("tar").arg("-tvf").arg(src).spawn()?.wait()?;
-    }
-
-    Format::Zip => {
-      Command::new("unzip").arg("-l").arg(src).spawn()?.wait()?;
-    }
-  }
-
-  Ok(())
-}
-
 fn main() -> Result<()> {
   let args = Args::parse();
 
-  if let Some(file) = args.extract {
-    extract(file, args.files.first().cloned()).context("Failed to extract file")?;
-  } else if let Some(file) = args.compress {
-    compress(&args.files, file).context("Failed to compress file(s)")?;
-  } else if let Some(file) = args.list {
-    list(file).context("Failed to list contents of file")?;
+  if let Some(archive) = &args.extract {
+    args.extract(archive).context("Failed to extract file")?;
+  } else if let Some(archive) = &args.compress {
+    args.compress(archive).context("Failed to compress file(s)")?;
+  } else if let Some(archive) = &args.list {
+    args.list(archive).context("Failed to list contents of file")?;
   }
 
   Ok(())

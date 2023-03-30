@@ -6,6 +6,4 @@ pkgs.rustPlatform.buildRustPackage rec {
   src = ./.;
 
   cargoLock = { lockFile = ./Cargo.lock; };
-
-  buildInputs = with pkgs; [ gnutar zip ];
 }
