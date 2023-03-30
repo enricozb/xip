@@ -49,6 +49,9 @@ impl TryFrom<&Path> for Format {
 }
 
 fn extract(src: PathBuf, dst: Option<PathBuf>) -> Result<()> {
+  // fail early on the format being invalid
+  let format = Format::try_from(src.as_path())?;
+
   // Create a destination directory if none exists
   let dst = if let Some(dst) = dst {
     dst
@@ -60,7 +63,7 @@ fn extract(src: PathBuf, dst: Option<PathBuf>) -> Result<()> {
     dst
   };
 
-  match Format::try_from(src.as_path())? {
+  match format {
     Format::Tar | Format::TarGz => {
       Command::new("tar").arg("-xf").arg(src).arg("--directory").arg(dst).spawn()?.wait()?;
     }
