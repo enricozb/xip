@@ -135,7 +135,7 @@ impl TryFrom<&Path> for Format {
       Ok(Format::Zip)
     } else if path_str.ends_with(".tar") {
       Ok(Format::Tar)
-    } else if path_str.ends_with(".tar.gz") {
+    } else if path_str.ends_with(".tar.gz") || path_str.ends_with(".tgz") {
       Ok(Format::TarGz)
     } else {
       Err(format_err!("Unsupported extension: {:?}", path))
