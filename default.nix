@@ -1,8 +1,8 @@
 { pkgs ? import <nixpkgs> { } }:
 
 pkgs.rustPlatform.buildRustPackage rec {
-  pname = "clip";
-  version = "0.4.1";
+  pname = "xip";
+  version = "0.5.0";
   src = ./.;
 
   cargoLock = { lockFile = ./Cargo.lock; };
